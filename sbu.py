@@ -7,8 +7,9 @@ from argparse import ArgumentParser, Namespace
 from enum import Enum, auto
 from functools import reduce
 from pathlib import Path
-from shutil import copy2, copytree
+from shutil import copy2, copytree, make_archive
 from sys import exit, platform
+from tempfile import TemporaryDirectory
 
 
 class BackupFileParser:
@@ -108,15 +109,7 @@ class DestFolderNotIncludedInPathFilter(FileFilter):
 
 
 class Filterer:
-    def __init__(self, backup_file: Path, dest: Path, files: list[Path]) -> None:
-        if not backup_file.exists():
-            raise FileNotFoundError(f"The backup file '{backup_file}' does not exist.")
-        if not backup_file.is_file():
-            raise FileNotFoundError(
-                f"The path '{backup_file}' does not refer to a file."
-            )
-        self._backup_file = backup_file.resolve()
-
+    def __init__(self, dest: Path, files: list[Path]) -> None:
         if not dest.exists():
             raise FileNotFoundError(
                 f"The destination directory '{dest}' does not exist"
@@ -131,9 +124,9 @@ class Filterer:
         filters: list[FileFilter] = []
         filters.append(IsAbsolutePathFilter())
         filters.append(FileExistsFilter())
+        filters.append(DestFolderNotIncludedInPathFilter(self._dest))
         filters.append(PathNotDestFolderFilter(self._dest))
         filters.append(PathNotIncludedInDestFolderFilter(self._dest))
-        filters.append(DestFolderNotIncludedInPathFilter(self._backup_file))
         self._filters = filters
 
     def _filter(self, src: list[Path]) -> list[Path]:
@@ -204,14 +197,19 @@ class Optimizer:
         return self._minimize_paths(self._files)
 
 
-class CopyFiles:
-    class CopyConflictMode(Enum):
-        NO_OVERWRITE = auto()
-        OVERWRITE = auto()
-        ASK = auto()
+class CopyConflictMode(Enum):
+    NO_OVERWRITE = auto()
+    OVERWRITE = auto()
+    ASK = auto()
 
+
+class CopyFiles:
     def __init__(
-        self, dest: Path, files: set[Path], *, conflict_mode: CopyConflictMode
+        self,
+        dest: Path,
+        files: set[Path],
+        *,
+        conflict_mode: CopyConflictMode = CopyConflictMode.NO_OVERWRITE,
     ) -> None:
         if not dest.exists():
             raise FileNotFoundError(
@@ -236,10 +234,10 @@ class CopyFiles:
                 logging.debug("Source is file")
                 copy = (
                     not target.exists()
-                    or self._conflict_mode == self.CopyConflictMode.OVERWRITE
+                    or self._conflict_mode == CopyConflictMode.OVERWRITE
                 )
-                if not copy and self._conflict_mode == self.CopyConflictMode.ASK:
-                    copy = self._overwrite_confirmation(path)
+                if not copy and self._conflict_mode == CopyConflictMode.ASK:
+                    copy = Util.overwrite_confirmation(path)
                 if copy:
                     logging.info(f"Copying '{path}' to '{target}'")
                     if not pretend:
@@ -265,9 +263,9 @@ class CopyFiles:
                 logging.debug("Source is file")
                 copy = (
                     not target.exists()
-                ) or self._conflict_mode == self.CopyConflictMode.OVERWRITE
-                if not copy and self._conflict_mode == self.CopyConflictMode.ASK:
-                    copy = self._overwrite_confirmation(path)
+                ) or self._conflict_mode == CopyConflictMode.OVERWRITE
+                if not copy and self._conflict_mode == CopyConflictMode.ASK:
+                    copy = Util.overwrite_confirmation(path)
                 if copy:
                     logging.info(f"Copying '{path}' to '{target}'")
                     if not pretend:
@@ -284,7 +282,13 @@ class CopyFiles:
         logging.debug(f"Done merging '{src}' and '{dest}'")
 
     @staticmethod
-    def _overwrite_confirmation(path: Path) -> bool:
+    def _concat_paths(p1: Path, p2: Path) -> Path:
+        return Path(str(p1) + str(p2))
+
+
+class Util:
+    @staticmethod
+    def overwrite_confirmation(path: Path) -> bool:
         confirmations = ["", "y", "yes"]
         declines = ["n", "no"]
         while True:
@@ -295,9 +299,91 @@ class CopyFiles:
             elif answer in declines:
                 return False
 
-    @staticmethod
-    def _concat_paths(p1: Path, p2: Path) -> Path:
-        return Path(str(p1) + str(p2))
+
+class NoDefaultFilenameAvailableError(Exception):
+    pass
+
+
+class Compression:
+    _default_name = "backup.sbu"
+    _max_index = 100
+
+    class Algorithm(Enum):
+        ZIP = "zip"
+        TAR = "tar"
+        GZTAR = "gztar"
+        BZTAR = "bztar"
+        XZTAR = "xztar"
+
+        def file_extension(self) -> str:
+            extension = {
+                Compression.Algorithm.ZIP: ".zip",
+                Compression.Algorithm.TAR: ".tar",
+                Compression.Algorithm.GZTAR: ".tar.gz",
+                Compression.Algorithm.BZTAR: ".tar.bz2",
+                Compression.Algorithm.XZTAR: ".tar.xz",
+            }
+            return extension[self]
+
+        @classmethod
+        def values(cls) -> list[str]:
+            return ["zip", "tar", "gztar", "bztar", "xztar"]
+
+    def __init__(
+        self,
+        dest: Path,
+        files: set[Path],
+        algorithm: Algorithm,
+        *,
+        conflict_mode: CopyConflictMode = CopyConflictMode.NO_OVERWRITE,
+    ) -> None:
+        if not dest.parent.exists():
+            raise NotADirectoryError(
+                f"The destination directory '{dest.parent}' does not exist!"
+            )
+
+        extension = algorithm.file_extension()
+        if dest.exists() and dest.is_dir():
+            dest = dest.joinpath(self._default_name + extension)
+            i: int = 1
+            while dest.exists() and i <= self._max_index:
+                dest = dest.parent.joinpath(
+                    self._default_name + "-" + str(i) + extension
+                )
+                i = i + 1
+            if i > self._max_index:
+                raise NoDefaultFilenameAvailableError(
+                    "Could not generate a default file name for compressed archive"
+                )
+        elif not dest.name.endswith(extension):
+            dest = dest.parent.joinpath(dest.name + extension)
+
+        self._dest = dest
+        self._files = files
+        self._algorithm = algorithm
+        self._conflict_mode = conflict_mode
+
+    def compress_files(self, pretend: bool = False) -> None:
+        logging.info(f"Compressing files to '{self._dest}'")
+        if self._dest.exists():
+            logging.warning("Destination already exists!")
+            copy = self._conflict_mode == CopyConflictMode.OVERWRITE
+            if not copy and self._conflict_mode == CopyConflictMode.ASK:
+                copy = Util.overwrite_confirmation(self._dest)
+
+            if not copy:
+                logging.info("No files are compressed")
+                return
+
+        with TemporaryDirectory(prefix="sbu_") as d:
+            tmpdir = Path(d)
+            logging.debug(f"Created temporary directory: '{tmpdir}'")
+            copy_files = CopyFiles(tmpdir, self._files)
+            copy_files.copy(pretend=pretend)
+            logging.info("Creating archive")
+            extension = self._algorithm.file_extension()
+            dest = self._dest.parent.joinpath(self._dest.name[: -len(extension)])
+            make_archive(str(dest), self._algorithm.value, tmpdir, ".", False, pretend)
 
 
 class Main:
@@ -320,6 +406,14 @@ class Main:
             "-p",
             "--pretend",
             action="store_true",
+            help="Show output without actually copying anything",
+        )
+
+        parser.add_argument(
+            "-c",
+            "--compress",
+            type=str,
+            choices=Compression.Algorithm.values(),
             help="Show output without actually copying anything",
         )
 
@@ -371,7 +465,10 @@ class Main:
 
         files = reader.get_paths()
         try:
-            filterer = Filterer(args.backup_file_path, args.backup_destination, files)
+            dest = args.backup_destination
+            if args.compress and not dest.is_dir():
+                dest = dest.parent
+            filterer = Filterer(dest, files)
         except FileNotFoundError as e:
             logging.error(e)
             exit(errno.ENOENT)
@@ -383,26 +480,48 @@ class Main:
         optimizer = Optimizer(filtered_files)
         optimized_files = optimizer.optimize()
 
-        conflict_mode = CopyFiles.CopyConflictMode.NO_OVERWRITE
+        conflict_mode = CopyConflictMode.NO_OVERWRITE
         if args.force:
-            conflict_mode = CopyFiles.CopyConflictMode.OVERWRITE
+            conflict_mode = CopyConflictMode.OVERWRITE
         elif args.interactive:
-            conflict_mode = CopyFiles.CopyConflictMode.ASK
+            conflict_mode = CopyConflictMode.ASK
 
-        try:
-            copyer = CopyFiles(
-                args.backup_destination,
-                optimized_files,
-                conflict_mode=conflict_mode,
-            )
-        except FileNotFoundError as e:
-            logging.error(e)
-            exit(errno.ENOENT)
-        except NotADirectoryError as e:
-            logging.error(e)
-            exit(errno.ENOTDIR)
+        if args.compress is not None:
+            algorithm = Compression.Algorithm(args.compress)
 
-        copyer.copy(pretend=args.pretend)
+            try:
+                compression = Compression(
+                    args.backup_destination,
+                    optimized_files,
+                    algorithm,
+                    conflict_mode=conflict_mode,
+                )
+            except FileNotFoundError as e:
+                logging.error(e)
+                exit(errno.ENOENT)
+            except NotADirectoryError as e:
+                logging.error(e)
+                exit(errno.ENOTDIR)
+            except NoDefaultFilenameAvailableError as e:
+                logging.error(e)
+                exit(errno.ENOENT)
+
+            compression.compress_files(pretend=args.pretend)
+        else:
+            try:
+                copyer = CopyFiles(
+                    args.backup_destination,
+                    optimized_files,
+                    conflict_mode=conflict_mode,
+                )
+            except FileNotFoundError as e:
+                logging.error(e)
+                exit(errno.ENOENT)
+            except NotADirectoryError as e:
+                logging.error(e)
+                exit(errno.ENOTDIR)
+
+            copyer.copy(pretend=args.pretend)
 
 
 if __name__ == "__main__":
