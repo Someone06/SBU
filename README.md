@@ -1,4 +1,4 @@
-# The Simple Backup Utility (SUB)
+# The Simple Backup Utility (SBU)
 SBU can be used to backup files and folders to another folder mounted in your
 file system.
 
@@ -22,8 +22,8 @@ A basic usage of SBU can look something like this:
 `./sbu /path/to/backup.txt /path/to/backup_folder`
 
 Hereby the "backup.txt" file has to contain a list of paths to files or folders
-to copy with one entry per line.  Comments starting with an "#" symbol are
-allowed as well.
+to copy, one entry per line.  Comments starting with an "#" symbol are allowed
+as well.
 
 If SBU refuses to be executed ensure that it is marked to be executable.
 
@@ -48,27 +48,29 @@ it is excluded from the copy operations.
 
 ### Updating backups
 Backups are usually not just created once but updated periodically.  SBU offers
-no support for storing multiple versions of the same file or other support for
-version control. This could in principal be achieved by combining SBU with Git
-if desired.  If more sophisticated method for version control are desired then
-SBU is not the right tool.
+no support for storing multiple versions of the same file or any other support
+for version control. Some form of version control could in principal be 
+achieved by combining SBU with Git. However, this will only work well if the
+only files backed up are text files and not images or video files for example.
+If more sophisticated methods for version control are desired then SBU is not
+the right tool.
 
 SBU can be used to updated backups if more files (or folders) to back up have
 been added to the backups.txt file. Just run SBU again.  By default it will not
-overwrite per-existing files. If overriding in the backup folder is desired
-then this can be achieved using the `--force` or `-f` option.  Alternatively,
-the `--interactive` or `-i` option will ask every time if a given file should 
-be overwritten.
+overwrite per-existing files. If all files in the backup folder should be 
+overwritten than this can be achieved using the `--force` or `-f` option.
+Alternatively, the `--interactive` or `-i` option will ask every time if a 
+given file should be overwritten.
 
 ### Creating archives
 SBU can also be used to create an (compressed) archive or a ZIP-Folder instead
-of a backup folder. This can be enabled by using the `--compress` or `-c`
-option.  In this case the archive will be placed inside the specified backup
-folder.
+of copying to a per-existing backup folder. This can be enabled by using the
+`--compress` or `-c` option.  In this case the archive will be placed inside
+the specified backup folder.
 
 ### Verbosity control
 By default SBU only prints warnings and errors.  To silence warnings use the
-`--quite` o r`-q` options. However, errors will still be printed. To show more
+`--quite` or `-q` option. However, errors will still be printed. To show more
 information about what SBU is doing use the `--verbose` or `-v` option.  To
 show debug output use `--debug` or `-d`.
 
@@ -87,7 +89,7 @@ Package Index (PyPI).  SBU is intended to be kept simple and simple to use.
 External dependencies (besides the Python standard library) would oppose this
 goal.
 
-Currently SBU works only in Linux.  If it is executed on a different operating
+Currently SBU only works on Linux. If it is executed on a different operating
 system it **should** just print a warning and exit.  In principal SBU could
 also be updated to work with other operating systems as well.  If anyone wants
 to add support for another operating system feel free to implement
@@ -124,7 +126,7 @@ pull-request to be accept the code must be formatted accordingly, the linter
 must not give any warnings and the code must be statically typed and checked
 using MyPy.
 
-SBU deliberately is contained within one file and uses no external dependencies
+SBU is deliberately contained within one file and uses no external dependencies
 from the PyPI.  Pull request which introduce additional source code files or
 external dependencies will not be accepted.
 
