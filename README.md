@@ -49,7 +49,7 @@ it is excluded from the copy operations.
 ### Updating backups
 Backups are usually not just created once but updated periodically.  SBU offers
 no support for storing multiple versions of the same file or any other support
-for version control. Some form of version control could in principal be 
+for version control. Some form of version control could in principal be
 achieved by combining SBU with Git. However, this will only work well if the
 only files backed up are text files and not images or video files for example.
 If more sophisticated methods for version control are desired then SBU is not
@@ -57,9 +57,9 @@ the right tool.
 
 SBU can be used to updated backups if more files (or folders) to back up have
 been added to the backups.txt file. Just run SBU again.  By default it will not
-overwrite per-existing files. If all files in the backup folder should be 
+overwrite per-existing files. If all files in the backup folder should be
 overwritten than this can be achieved using the `--force` or `-f` option.
-Alternatively, the `--interactive` or `-i` option will ask every time if a 
+Alternatively, the `--interactive` or `-i` option will ask every time if a
 given file should be overwritten.
 
 ### Creating archives
@@ -121,8 +121,8 @@ SBU requires [Black](https://pypi.org/project/black/ "Black") and
 [Flake8](https://pypi.org/project/flake8/ "Flake8") for linting and
 [MyPy](https://pypi.org/project/mypy/ "MyPy") for static typing.
 Additionally [Pre-commit](https://pypi.org/project/pre-commit/ "Pre-commit") is
-used for automatically running those checks **before** every commit.  For a 
-pull-request to be accept the code must be formatted accordingly, the linter 
+used for automatically running those checks **before** every commit.  For a
+pull-request to be accept the code must be formatted accordingly, the linter
 must not give any warnings and the code must be statically typed and checked
 using MyPy.
 
@@ -131,4 +131,15 @@ from the PyPI.  Pull request which introduce additional source code files or
 external dependencies will not be accepted.
 
 # License
-TODO! SBU has not yet been published.
+SBU is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
