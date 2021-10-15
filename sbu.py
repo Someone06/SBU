@@ -25,6 +25,7 @@ from pathlib import Path
 from shutil import copy2, copytree, make_archive
 from sys import exit, platform
 from tempfile import TemporaryDirectory
+from typing import Optional, cast
 
 
 class BackupFileParser:
@@ -44,7 +45,11 @@ class BackupFileParser:
             ignore_comments = filter(self._ignore_comments, trimed)
             ignore_empty_lines = filter(self._ignore_empty_lines, ignore_comments)
             paths = map(self._create_path, ignore_empty_lines)
-            result = list(paths)
+            expanded = cast(
+                list[Path],
+                filter(lambda p: p is not None, map(self._expanduser, paths)),
+            )
+            result = list(expanded)
             logging.debug(f"Found files: {result}.")
             return result
 
@@ -59,6 +64,14 @@ class BackupFileParser:
     @staticmethod
     def _ignore_empty_lines(line: str) -> bool:
         return line != ""
+
+    @staticmethod
+    def _expanduser(path: Path) -> Optional[Path]:
+        try:
+            return path.expanduser()
+        except RuntimeError:
+            logging.warning(f"Cannot expand  path '{path}'. Is ignored.")
+            return None
 
 
 class FileFilter(ABC):
