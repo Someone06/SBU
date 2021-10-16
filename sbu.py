@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import errno
+import filecmp
 import logging
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser, Namespace
@@ -260,12 +261,17 @@ class CopyFiles:
             logging.debug(f"Target: '{target}'")
             if path.is_file():
                 logging.debug("Source is file")
-                copy = (
-                    not target.exists()
-                    or self._conflict_mode == CopyConflictMode.OVERWRITE
-                )
-                if not copy and self._conflict_mode == CopyConflictMode.ASK:
+                copy: bool = False
+                if not target.exists():
+                    copy = True
+                elif filecmp.cmp(path, target):
+                    logging.info("Source and target are identical - skipping")
+                    copy = False
+                elif self._conflict_mode == CopyConflictMode.OVERWRITE:
+                    copy = True
+                elif self._conflict_mode == CopyConflictMode.ASK:
                     copy = Util.overwrite_confirmation(path)
+
                 if copy:
                     logging.info(f"Copying '{path}' to '{target}'")
                     if not pretend:
@@ -289,11 +295,17 @@ class CopyFiles:
             logging.debug(f"Target: '{target}'")
             if path.is_file():
                 logging.debug("Source is file")
-                copy = (
-                    not target.exists()
-                ) or self._conflict_mode == CopyConflictMode.OVERWRITE
-                if not copy and self._conflict_mode == CopyConflictMode.ASK:
+                copy: bool = False
+                if not target.exists():
+                    copy = True
+                elif filecmp.cmp(path, target):
+                    logging.debug("Source and target are identical - skipping")
+                    copy = False
+                elif self._conflict_mode == CopyConflictMode.OVERWRITE:
+                    copy = True
+                elif self._conflict_mode == CopyConflictMode.ASK:
                     copy = Util.overwrite_confirmation(path)
+
                 if copy:
                     logging.info(f"Copying '{path}' to '{target}'")
                     if not pretend:
