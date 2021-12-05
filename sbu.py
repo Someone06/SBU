@@ -192,33 +192,33 @@ class Optimizer:
     # Then <= is a partial order.
     # Moreover, S' then is the set of maximal elements of S using <=.
     #
-    # To find those set of maximum elements we build a graph G=(V,E) where V = S and
-    # (a,b) in E <=> a < b for all a, b in S. Then we need to find all vertices that
-    # have no successor. Those are the maximal elements of S with regards to <=.
+    # To find the maximal elements in the worst case O(n^2) time is required:
+    # Consider a set where no two elements are comparable (so every element is
+    # maximal). To determine that no two elements are comparable each element
+    # need to be compare to each other.
     def _minimize_paths(self, paths: list[Path]) -> set[Path]:
-        # TODO: This can probably be done more efficiently
         logging.info("Minimizing paths to copy")
-        successors: dict[Path, set[Path]] = {p: set() for p in paths}
 
+        # Reminder:
         # We have Path("/a/b/../").samefile(Path("/a/")),
-        # but Path("/a/b/../") != (Path("/a/"))
-        paths = list(set(paths))
+        # but Path("/a/b/../") != (Path("/a/")).
+        # So use path.resolve() to obtain canonical representation and then
+        # eliminate the duplicates.
+        paths = list(set(path.resolve() for path in paths))
+        has_successor = [False] * len(paths) 
 
-        for i in range(0, len(paths)):
-            p1 = paths[i]
-            for j in range(i + 1, len(paths)):
-                p2 = paths[j]
-                if p1.samefile(p2):
-                    successors[p2].add(p1)
+        for i, p1 in enumerate(paths):
+            for j, p2 in enumerate(paths):
+                if j <= i:
+                    continue
+                elif p1.samefile(p2):
+                    assert False, "Resolved path representations are unique"  
                 elif p1 in p2.parents:
-                    successors[p2].add(p1)
+                    has_successor[j] = True
                 elif p2 in p1.parents:
-                    successors[p1].add(p2)
+                    has_successor[i] = True
 
-        logging.debug(f"Successors: {successors}")
-        no_successor_entry = filter(lambda t: len(t[1]) == 0, successors.items())
-        no_successors = map(lambda e: e[0], no_successor_entry)
-        result = set(no_successors)
+        result = {path for i, path in enumerate(paths) if not has_successor[i]}
         logging.debug(f"Paths left after minimizing: {result}")
         return result
 
