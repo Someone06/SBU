@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3.10
 
 # Copyright 2021 Michael Pusl
 #
@@ -205,14 +205,14 @@ class Optimizer:
         # So use path.resolve() to obtain canonical representation and then
         # eliminate the duplicates.
         paths = list(set(path.resolve() for path in paths))
-        has_successor = [False] * len(paths) 
+        has_successor = [False] * len(paths)
 
         for i, p1 in enumerate(paths):
             for j, p2 in enumerate(paths):
                 if j <= i:
                     continue
                 elif p1.samefile(p2):
-                    assert False, "Resolved path representations are unique"  
+                    assert False, "Resolved path representations are unique"
                 elif p1 in p2.parents:
                     has_successor[j] = True
                 elif p2 in p1.parents:
